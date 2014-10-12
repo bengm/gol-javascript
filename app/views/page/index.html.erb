@@ -1,0 +1,342 @@
+<script type="text/javascript">
+
+  // game rules as 2 dimentional array
+  // first row pertains to dead cells, 2nd to living
+  // can look up if you will live next round
+  // e.g. cell that is alive (1) w/ 2 living neighbors would
+  //   use as rules[1][2] => 1 (will live next round)
+  var rules = [
+    [0,0,0,1,0,0,0,0],
+    [0,0,1,1,0,0,0,0]
+  ]
+
+    // [0,0,0,1,0,0,0,0],
+    // [0,0,1,1,0,0,0,0]
+
+  // reference to find neighbors by iterating around a cell
+  var neighborDiffs = [
+    [-1, 1], [ 0, 1], [ 1, 1],
+    [-1, 0],          [ 1, 0],
+    [-1,-1], [ 0,-1], [ 1,-1],
+  ]
+
+  // default starting point of board
+  var theLiving = [[5,3],[6,3],[7,3],[7,2],[6,1],[5,8],[6,8],[7,8],[7,7],[6,6],[6,11],[7,12],[7,13],[6,13],[5,13],[25,10],[26,10],[27,10],[28,10],[28,9],[28,8],[27,7],[24,9],[24,7],[19,20],[19,19],[19,18],[18,21],[17,21],[16,21],[19,24],[19,25],[19,26],[18,23],[17,23],[16,23],[18,16],[17,16],[16,16],[14,20],[14,19],[14,18],[14,24],[14,25],[14,26],[21,20],[21,19],[21,18],[22,21],[23,21],[24,21],[22,23],[23,23],[24,23],[21,24],[21,25],[21,26],[18,28],[17,28],[16,28],[22,28],[23,28],[24,28],[22,16],[23,16],[24,16],[26,20],[26,19],[26,18],[26,24],[26,25],[26,26]] 
+
+  // set up arrays that will be used in game logic
+  var livingIds = []
+  var census = []
+
+  // CELL
+  isAlive = function(x,y) {
+    var alive = 0
+    if ( livingIds.indexOf(stringify([x,y])) > -1 ) {
+      alive = 1
+    }
+    return alive
+  }
+  stringify = function(coords) {
+    return coords[0] + "_" + coords[1]
+  }
+  willLive = function(alive,livingNeighborCount) {
+    return rules[ alive ][ livingNeighborCount ] == 1
+  }
+  findNeighborsOf = function(x,y) {
+    return neighborDiffs.map(function(dif){
+      return [x-dif[0],y-dif[1],]
+    })
+  }
+
+  // BOARD
+  generateLivingIds = function() {
+    livingIds = theLiving.map(function(e) {
+      return stringify(e)
+    })
+  }
+  toggleCell = function(cellId) {
+    // parse x,y
+    var coords = cellId.split("_")
+    var x = +coords[0]
+    var y = +coords[1]
+    var foundIt = false
+    // loop through existing living to kill if found
+    $.each(theLiving,function(i,e){
+      if (e[0]==x && e[1]==y) {
+        iToKill = i
+        foundIt = true
+      } 
+    })
+    if (foundIt) {
+      theLiving.splice(iToKill,1)
+    } else {
+      theLiving.push([x,y])
+    }
+    // finally redraw the world
+    drawWorld()
+  }
+  addToCensus = function(celldata) {
+    // check if it exists
+    var existing = census.filter( function(e) { 
+      return e['id'] == celldata['id']
+    })[0]
+    if (existing) {
+      // update an existing
+      $.extend(existing,celldata)
+    } else {
+      // if not, add new as hash
+      census.push(celldata)
+    }
+  }
+  survey = function() {
+    // loop through the living
+    $.each(theLiving, function(i, livingCell) {
+      // find their neighbors and count the living <<<<<<<< HERE
+      livingNeighborCount = 0
+      $.each(findNeighborsOf(livingCell[0],livingCell[1]), function(j,neighborCell) {
+        // add to neighbor count 
+        neighborAlive = isAlive(neighborCell[0],neighborCell[1])
+        if (neighborAlive) { livingNeighborCount++ }
+        // find living neighbors of neighbor
+        nLivingNeighborCount = 0
+        $.each(findNeighborsOf(neighborCell[0],neighborCell[1]), function(k,nNeighborCell) {
+          if ( isAlive(nNeighborCell[0],nNeighborCell[1]) ) { nLivingNeighborCount++ }
+        })
+        // add neighbor to the survey
+        addToCensus({
+          id: stringify(neighborCell),
+          x: neighborCell[0],
+          y: neighborCell[1],
+          neighbor: true,
+          alive: neighborAlive,
+          livingNeighborCount: nLivingNeighborCount,
+          willLive: willLive(neighborAlive,nLivingNeighborCount)
+        })
+      })
+      // add living cell to the survey
+      addToCensus({
+        id: stringify(livingCell),
+        x: livingCell[0],
+        y: livingCell[1],
+        livingNeighborCount: livingNeighborCount,
+        alive: 1,
+        willLive: willLive(1,livingNeighborCount)
+      })
+    });
+  } // survey
+
+  // CONTROL
+  step = function() {
+    theLiving = census.filter(function(e){ return e.willLive })
+                      .map(function(e){return [e.x,e.y]})
+    drawWorld()
+  }
+  playPause = function() {
+    if (playing) {
+      window.clearInterval(ticktock)
+      $('#playPause').text("Play")
+      playing=false
+    }
+    else {
+      ticktock = window.setInterval(step,500)
+      $('#playPause').text("Pause")
+      playing = true
+    }
+  }
+  randomize = function(sample) {
+    theLiving=[]
+    for (x=0; x<55; x++) {
+      for (y=0; y<55; y++) {
+        if (Math.random() < sample) { theLiving.push([x,y]) }
+      }
+    }
+    drawWorld()
+  }
+  clear = function() {
+    theLiving=[]
+    drawWorld()
+  }
+
+  // DRAWING
+  drawWorld = function() {
+    // console.log(JSON.stringify(theLiving))
+    census=[]
+    // do the math
+    generateLivingIds()
+    survey()
+    // color all as dead
+    $('.alive').removeClass('alive')
+    $('td.cell').removeClass('staying')
+    $('td.cell').removeClass('rising')
+    $('td.cell').removeClass('neighbor')
+    $.each(census,function(i,cell) {
+      // if (cell.alive==1) { $('#'+cell.id).addClass('alive') }
+      if (cell.alive==1 && cell.willLive)       { $('#'+cell.id).addClass('staying') }
+      else if (cell.neighbor && cell.willLive)  { $('#'+cell.id).addClass('rising') }
+      else if (cell.alive==1)                   { $('#'+cell.id).addClass('alive') }
+      else if (cell.neighbor)                   { $('#'+cell.id).addClass('neighbor') }
+    })
+    drawRules()
+  }
+  drawRules = function() {
+    $('.keyCell').removeClass('alive')
+    $.each(rules,function(l,row){
+      $.each(row,function(n,val){
+        if (val==1) {
+          $('#rule'+l+"_"+n).addClass('alive')
+        }
+      })
+    })
+  }
+  toggleRule = function(cellId){
+    var coords = cellId.substr(4,3).split("_")
+    l = +coords[0]    // living?
+    n = +coords[1]    // living neighbor count
+    if (rules[l][n]==1) {
+      rules[l][n] = 0
+    } else {
+      rules[l][n] = 1
+    }
+    drawRules()
+  }
+
+  $(document).ready(function(){
+    drawWorld() 
+    playing = false
+    $('#playPause').click(playPause)
+    $('#randomize30').click( function(e){ randomize(.30) } )
+    $('#randomize20').click( function(e){ randomize(.20) } )
+    $('#randomize10').click( function(e){ randomize(.10) } )
+    $('#clear').click(clear)
+    $('td.cell').click(function(e){
+      toggleCell( $(this).context.id )
+    })
+    $('td.keyCell').click(function(e){
+      toggleRule( $(this).context.id )
+    })
+  });
+
+
+</script>
+
+
+<style type="text/css">
+  body {background: #eee;}
+  h2 {margin-top:0px;}
+  td.cell, td.keyCell {
+    border: 1px solid #ddd; 
+    width: 10px;
+    height: 10px;
+    padding: 0px;
+    background: #fff;
+  }
+ /* td.neighbor {
+    background:#f99;
+  }
+  td.rising {
+    background:#ff9;
+  }*/
+  td.alive {
+    background:#777;  /* #777 */
+  }
+  td.staying {
+    background:#000;
+  }
+</style>
+
+<div class="container" style='margin-top: 30px;'>
+
+<div class="row">
+
+  <div class="col col-sm-3">
+
+    <h2>GAME of LIFE</h2>
+    
+    <button class="btn btn-lg btn-success" id="playPause" style="width:100%">Play</button><br><br>
+
+
+          <div class="panel panel-primary">
+            <div class="panel-heading">
+              <h3 class="panel-title">Population</h3>
+            </div>
+            <div class="panel-body">
+              <button class="btn btn-default" id="clear" style="width:100%">Clear</button><br><br>
+              <div class="btn-group">
+                <button class="btn btn-default" id="randomize30">Random 30%</button>
+                <button class="btn btn-default" id="randomize20">20%</button>
+                <button class="btn btn-default" id="randomize10">10%</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="panel panel-primary">
+            <div class="panel-heading">
+              <h3 class="panel-title">Rules</h3>
+            </div>
+            <div class="panel-body">
+              <table>
+                <tr>
+                  <th>Neighbor Count --></th>
+                  <th>0</th>
+                  <th>1</th>
+                  <th>2</th>
+                  <th>3</th>
+                  <th>4</th>
+                  <th>5</th>
+                  <th>6</th>
+                  <th>7</th>
+                  <th>8</th>
+                </tr>
+                <tr>
+                  <th>If Dead</th>
+                  <td class="keyCell" id="rule0_0"></td>
+                  <td class="keyCell" id="rule0_1"></td>
+                  <td class="keyCell" id="rule0_2"></td>
+                  <td class="keyCell" id="rule0_3"></td>
+                  <td class="keyCell" id="rule0_4"></td>
+                  <td class="keyCell" id="rule0_5"></td>
+                  <td class="keyCell" id="rule0_6"></td>
+                  <td class="keyCell" id="rule0_7"></td>
+                  <td class="keyCell" id="rule0_8"></td>
+                </tr>
+                <th>If Alive</th>
+                  <td class="keyCell" id="rule1_0"></td>
+                  <td class="keyCell" id="rule1_1"></td>
+                  <td class="keyCell" id="rule1_2"></td>
+                  <td class="keyCell" id="rule1_3"></td>
+                  <td class="keyCell" id="rule1_4"></td>
+                  <td class="keyCell" id="rule1_5"></td>
+                  <td class="keyCell" id="rule1_6"></td>
+                  <td class="keyCell" id="rule1_7"></td>
+                  <td class="keyCell" id="rule1_8"></td>
+                </tr>
+              </table>
+            </div>
+          </div>
+
+
+
+
+  </div>
+
+  <div class="col col-sm-9">
+
+    <table>
+      <% (0..50).each do |row| %>
+        <tr>
+          <% (0..55).each do |col| %>
+            <td class="cell alive" id="<%=col%>_<%=row%>"></td>
+          <% end %>
+        </tr>
+      <% end %>
+    </table>
+
+  </div>
+
+</div>
+<!-- 
+<footer>
+  <p>@bengm's implementation of <a href="http://en.wikipedia.org/wiki/Conway's_Game_of_Life">Conway's Game of Life</a></p>
+  <p>see on GitHub</p>
+</footer>
+ -->
+</div>
