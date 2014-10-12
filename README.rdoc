@@ -2,7 +2,7 @@
 
 I decided to make a version of Conway's Game of Life during DCamp 2014. 
 
-The app happens to be in Rails - but there is no ruby/rails code upon which the app relies.
+The app happens to be in Rails - but there is no ruby/rails code upon which the app relies. It shouldn't be a rails app, but hey, that's how I started, and it's a toy project.
 
 ===Features:
 * Play/pause the game
@@ -14,6 +14,7 @@ More on Conway's Game of Life:
 http://en.wikipedia.org/wiki/Conway's_Game_of_Life
 
 See it in action:
+http://conways-game-of-life-in-js.herokuapp.com/
 
 ===License:
 MIT
