@@ -4,8 +4,8 @@ I decided to make a version of Conway's Game of Life during DCamp 2014.
 
 The app happens to be in Rails - but there is no ruby/rails code upon which the app relies.
 
-Features:
- - Play/pause the game
- - Randomly seed the board
- - Click to toggle cells as live/dead
- - Change the rules of the game in-flight
+===Features:
+* Play/pause the game
+* Randomly seed the board
+* Click to toggle cells as live/dead
+* Change the rules of the game in-flight
